@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>题目详情 - OnlineOJ</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <link rel="stylesheet" href="/css/custom.css">
+</head>
+<body>
+    <main class="container">
+        <nav id="navbar"></nav>
+        <h3 id="problemTitle"></h3>
+        <p><small>难度: <span id="problemDiff"></span> | 标签: <span id="problemTags"></span></small></p>
+        <article id="problemDesc" style="white-space:pre-wrap"></article>
+
+        <h4>提交代码</h4>
+        <textarea id="codeInput" rows="12" style="font-family:monospace;width:100%"></textarea>
+        <button onclick="submitCode()" id="submitBtn" style="margin-top:0.5rem">提交</button>
+        <small id="submitHint" style="margin-left:1rem"></small>
+
+        <div id="resultPanel" class="result-panel" style="display:none"></div>
+    </main>
+    <div id="toast" class="toast"></div>
+    <script src="/js/api.js"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/utils.js"></script>
+    <script src="/js/components.js"></script>
+    <script>
+        const problemId = getParam('id');
+        let pollingTimer = null;
+        const diffLabel = { easy: '简单', medium: '中等', hard: '困难' };
+
+        async function loadProblem() {
+            try {
+                const p = await api.get(`/api/problems/${problemId}`);
+                document.getElementById('problemTitle').textContent = p.title;
+                document.getElementById('problemDiff').textContent = diffLabel[p.difficulty] || p.difficulty;
+                document.getElementById('problemTags').innerHTML = (p.tags || []).map(t => `<kbd>${htmlEscape(t)}</kbd>`).join(' ');
+                document.getElementById('problemDesc').textContent = p.description;
+                if (p.code_template) document.getElementById('codeInput').value = p.code_template;
+                else document.getElementById('codeInput').value = '#include <iostream>\nusing namespace std;\n\nint main() {\n    return 0;\n}\n';
+            } catch (err) { showToast(err.message, 'error'); }
+        }
+
+        async function submitCode() {
+            const code = document.getElementById('codeInput').value;
+            if (!code.trim()) return showToast('请编写代码', 'error');
+            document.getElementById('submitBtn').disabled = true;
+            document.getElementById('submitHint').textContent = '提交中...';
+            document.getElementById('resultPanel').style.display = 'none';
+            try {
+                const data = await api.post('/api/submit', { problem_id: parseInt(problemId), code });
+                pollResult(data.submission_id);
+            } catch (err) {
+                showToast(err.message, 'error');
+                document.getElementById('submitBtn').disabled = false;
+                document.getElementById('submitHint').textContent = '';
+            }
+        }
+
+        function pollResult(submissionId) {
+            let attempts = 0;
+            if (pollingTimer) clearInterval(pollingTimer);
+            pollingTimer = setInterval(async () => {
+                attempts++;
+                try {
+                    const s = await api.get(`/api/submissions/${submissionId}`);
+                    if (s.status !== 'pending' && s.status !== 'compiling' && s.status !== 'running') {
+                        clearInterval(pollingTimer);
+                        document.getElementById('submitBtn').disabled = false;
+                        document.getElementById('submitHint').textContent = '';
+                        showResult(s);
+                        return;
+                    }
+                    document.getElementById('submitHint').textContent = statusLabel(s.status) + '...';
+                } catch {}
+                if (attempts > 60) {
+                    clearInterval(pollingTimer);
+                    document.getElementById('submitBtn').disabled = false;
+                    document.getElementById('submitHint').textContent = '';
+                    showToast('评测超时，请刷新查看结果', 'error');
+                }
+            }, 500);
+        }
+
+        function showResult(s) {
+            const panel = document.getElementById('resultPanel');
+            panel.style.display = 'block';
+            const color = statusColor(s.status);
+            let html = `<h4 style="color:${color}">${statusLabel(s.status)}</h4>`;
+            html += `<p>通过: ${s.passed_cases}/${s.total_cases}`;
+            if (s.time_used_ms) html += ` | 耗时: ${s.time_used_ms}ms`;
+            if (s.memory_used_kb) html += ` | 内存: ${s.memory_used_kb}KB`;
+            html += `</p>`;
+
+            if (s.status === 'compilation_error' && s.compile_error) {
+                html += `<details><summary>编译错误</summary><pre class="code-block">${htmlEscape(s.compile_error)}</pre></details>`;
+            }
+            if (s.status === 'wrong_answer' && s.detail) {
+                const d = s.detail;
+                html += `<p>失败测试点: #${s.failed_case}</p>`;
+                if (d.input_data) html += `<details><summary>输入</summary><pre>${htmlEscape(d.input_data)}</pre></details>`;
+                if (d.expected_output) html += `<details><summary>期望输出</summary><pre>${htmlEscape(d.expected_output)}</pre></details>`;
+                if (d.actual_output) html += `<details><summary>实际输出</summary><pre>${htmlEscape(d.actual_output)}</pre></details>`;
+            }
+            panel.innerHTML = html;
+        }
+
+        checkAuth().then(() => {
+            renderNavbar();
+            if (!isLoggedIn()) { window.location.href = '/login.html'; return; }
+            loadProblem();
+        });
+    </script>
+</body>
+</html>

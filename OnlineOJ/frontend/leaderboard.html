@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>排行榜 - OnlineOJ</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <link rel="stylesheet" href="/css/custom.css">
+</head>
+<body>
+    <main class="container">
+        <nav id="navbar"></nav>
+        <h3>排行榜</h3>
+        <div role="group" style="max-width:500px;margin-bottom:1rem">
+            <select id="filterDifficulty"><option value="">全部难度</option><option value="easy">简单</option><option value="medium">中等</option><option value="hard">困难</option></select>
+            <select id="filterTag"><option value="">全部标签</option></select>
+            <button onclick="loadBoard()">筛选</button>
+        </div>
+        <table role="grid"><thead><tr><th>排名</th><th>用户</th><th>通过数</th><th>通过率</th></tr></thead><tbody id="boardBody"></tbody></table>
+    </main>
+    <div id="toast" class="toast"></div>
+    <script src="/js/api.js"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/utils.js"></script>
+    <script src="/js/components.js"></script>
+    <script>
+        async function loadBoard() {
+            const diff = document.getElementById('filterDifficulty').value;
+            const tag = document.getElementById('filterTag').value;
+            let url = '/api/leaderboard?';
+            if (diff) url += `difficulty=${diff}&`;
+            if (tag) url += `tag=${encodeURIComponent(tag)}&`;
+            try {
+                const data = await api.get(url);
+                document.getElementById('boardBody').innerHTML = data.map((e, i) => `
+                    <tr><td>${i + 1}</td><td>${htmlEscape(e.username)}</td><td>${e.solved_count}</td><td>${(e.pass_rate * 100).toFixed(1)}%</td></tr>`).join('');
+            } catch (err) { showToast(err.message, 'error'); }
+        }
+        async function loadTags() {
+            try {
+                const tags = await api.get('/api/admin/tags');
+                const sel = document.getElementById('filterTag');
+                tags.forEach(t => { const o = document.createElement('option'); o.value = t.name; o.textContent = t.name; sel.appendChild(o); });
+            } catch {}
+        }
+        checkAuth().then(() => { renderNavbar(); if (!isLoggedIn()) window.location.href = '/login.html'; loadTags(); loadBoard(); });
+    </script>
+</body>
+</html>

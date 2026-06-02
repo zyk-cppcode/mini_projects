@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>提交详情 - OnlineOJ</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <link rel="stylesheet" href="/css/custom.css">
+</head>
+<body>
+    <main class="container">
+        <nav id="navbar"></nav>
+        <h3>提交 #<span id="subId"></span></h3>
+        <div id="subInfo"></div>
+        <h4>代码</h4>
+        <pre class="code-block" id="subCode"></pre>
+        <div id="subResult" class="result-panel"></div>
+    </main>
+    <div id="toast" class="toast"></div>
+    <script src="/js/api.js"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/utils.js"></script>
+    <script src="/js/components.js"></script>
+    <script>
+        const subId = getParam('id');
+        async function load() {
+            try {
+                const s = await api.get(`/api/submissions/${subId}`);
+                document.getElementById('subId').textContent = s.id;
+                document.getElementById('subInfo').innerHTML = `<p>题目: ${s.problem_id} | 状态: <span style="color:${statusColor(s.status)}">${statusLabel(s.status)}</span> | 提交时间: ${formatDate(s.submitted_at)}</p>`;
+                document.getElementById('subCode').textContent = s.code;
+
+                const panel = document.getElementById('subResult');
+                const color = statusColor(s.status);
+                let html = `<h4 style="color:${color}">${statusLabel(s.status)}</h4>`;
+                html += `<p>通过: ${s.passed_cases}/${s.total_cases}`;
+                if (s.time_used_ms) html += ` | 耗时: ${s.time_used_ms}ms`;
+                html += `</p>`;
+
+                if (s.status === 'compilation_error' && s.compile_error) {
+                    html += `<details><summary>编译错误</summary><pre class="code-block">${htmlEscape(s.compile_error)}</pre></details>`;
+                }
+                if (s.detail) {
+                    const d = s.detail;
+                    if (d.input_data) html += `<details><summary>输入</summary><pre>${htmlEscape(d.input_data)}</pre></details>`;
+                    if (d.expected_output) html += `<details><summary>期望输出</summary><pre>${htmlEscape(d.expected_output)}</pre></details>`;
+                    if (d.actual_output) html += `<details><summary>实际输出</summary><pre>${htmlEscape(d.actual_output)}</pre></details>`;
+                }
+                panel.innerHTML = html;
+            } catch (err) { showToast(err.message, 'error'); }
+        }
+        checkAuth().then(() => { renderNavbar(); if (!isLoggedIn()) window.location.href = '/login.html'; load(); });
+    </script>
+</body>
+</html>

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>题目列表 - OnlineOJ</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <link rel="stylesheet" href="/css/custom.css">
+</head>
+<body>
+    <main class="container">
+        <nav id="navbar"></nav>
+        <h3>题目列表</h3>
+        <div role="group" style="max-width:600px;margin-bottom:1rem">
+            <select id="filterDifficulty"><option value="">全部难度</option><option value="easy">简单</option><option value="medium">中等</option><option value="hard">困难</option></select>
+            <select id="filterTag"><option value="">全部标签</option></select>
+            <button onclick="loadProblems(1)">筛选</button>
+        </div>
+        <div id="loading"></div>
+        <table id="problemTable" role="grid">
+            <thead><tr><th>#</th><th>标题</th><th>难度</th><th>标签</th></tr></thead>
+            <tbody></tbody>
+        </table>
+        <div id="pagination"></div>
+    </main>
+    <div id="toast" class="toast"></div>
+    <script src="/js/api.js"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/utils.js"></script>
+    <script src="/js/components.js"></script>
+    <script>
+        let currentPage = 1;
+        const diffLabel = { easy: '简单', medium: '中等', hard: '困难' };
+
+        async function loadProblems(page) {
+            currentPage = page;
+            document.getElementById('loading').textContent = '加载中...';
+            const diff = document.getElementById('filterDifficulty').value;
+            const tag = document.getElementById('filterTag').value;
+            let url = `/api/problems?page=${page}&page_size=20`;
+            if (diff) url += `&difficulty=${diff}`;
+            if (tag) url += `&tag=${encodeURIComponent(tag)}`;
+
+            try {
+                const data = await api.get(url);
+                const tbody = document.querySelector('#problemTable tbody');
+                tbody.innerHTML = data.items.map(p => `
+                    <tr>
+                        <td>${p.id}</td>
+                        <td><a href="/problem.html?id=${p.id}">${htmlEscape(p.title)}</a></td>
+                        <td>${diffLabel[p.difficulty] || p.difficulty}</td>
+                        <td>${(p.tags || []).map(t => `<kbd>${htmlEscape(t)}</kbd>`).join(' ')}</td>
+                    </tr>`).join('');
+                document.getElementById('pagination').innerHTML = renderPagination(currentPage, data.total, data.page_size, 'loadProblems');
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+            document.getElementById('loading').textContent = '';
+        }
+
+        async function loadTags() {
+            try {
+                const tags = await api.get('/api/admin/tags');
+                const sel = document.getElementById('filterTag');
+                tags.forEach(t => { const o = document.createElement('option'); o.value = t.name; o.textContent = t.name; sel.appendChild(o); });
+            } catch {}
+        }
+
+        checkAuth().then(() => {
+            renderNavbar();
+            if (!isLoggedIn()) { window.location.href = '/login.html'; return; }
+            loadTags();
+            loadProblems(1);
+        });
+    </script>
+</body>
+</html>
