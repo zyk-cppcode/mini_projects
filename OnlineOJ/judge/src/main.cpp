@@ -17,7 +17,7 @@ static JudgeResult judge_task(const JudgeTask& task) {
     result.memory_used_kb = 0;
     result.failed_case = 0;
 
-    CompileResult cr = compile(task.submission_id, task.code);
+    CompileResult cr = compile(task.submission_id, task.code, task.language);
     if (!cr.success) {
         result.status = "compilation_error";
         result.compile_error = cr.error;
@@ -38,7 +38,7 @@ static JudgeResult judge_task(const JudgeTask& task) {
 
     for (const auto& tc : testcases) {
         RunResult rr = run_test(task.submission_id, tc.input_data,
-                                task.time_limit, task.memory_limit);
+                                task.time_limit, task.memory_limit, task.language);
 
         if (rr.timed_out) {
             result.status = "time_limit_exceeded";

@@ -1,24 +1,29 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="light">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>标签管理 - OnlineOJ</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
     <link rel="stylesheet" href="/css/custom.css">
 </head>
 <body>
-    <main class="container">
-        <nav id="navbar"></nav>
-        <h3>标签管理</h3>
-        <a href="/admin/problems.html" role="button" class="secondary">返回题目管理</a>
-        <div role="group" style="max-width:400px;margin-top:1rem">
-            <input type="text" id="newTagName" placeholder="新标签名">
-            <button onclick="addTag()">添加</button>
+    <div id="sidebar"></div>
+    <div id="main-content">
+        <div class="top-bar"><h2>标签管理</h2></div>
+        <div class="content">
+            <div style="margin-bottom:16px;display:flex;gap:8px">
+                <a href="/admin/problems.html" class="btn btn-secondary">← 返回题目管理</a>
+            </div>
+            <div class="filter-bar">
+                <input type="text" id="newTagName" placeholder="新标签名" style="flex:1;max-width:300px">
+                <button onclick="addTag()">添加</button>
+            </div>
+            <table class="problem-table">
+                <thead><tr><th style="width:60px">ID</th><th>名称</th><th style="width:80px">操作</th></tr></thead>
+                <tbody id="tagList"></tbody>
+            </table>
         </div>
-        <hr>
-        <table role="grid"><thead><tr><th>ID</th><th>名称</th><th>操作</th></tr></thead><tbody id="tagList"></tbody></table>
-    </main>
+    </div>
     <div id="toast" class="toast"></div>
     <script src="/js/api.js"></script>
     <script src="/js/auth.js"></script>
@@ -29,16 +34,24 @@
             try {
                 const tags = await api.get('/api/admin/tags');
                 document.getElementById('tagList').innerHTML = tags.map(t => `
-                    <tr><td>${t.id}</td><td>${htmlEscape(t.name)}</td><td><a href="#" onclick="deleteTag(${t.id})" style="color:red">删除</a></td></tr>`).join('');
+                    <tr><td class="prob-id">${t.id}</td><td>${htmlEscape(t.name)}</td>
+                    <td><a href="#" onclick="deleteTag(${t.id})" style="color:var(--red);font-size:0.85em">删除</a></td></tr>`).join('');
             } catch (err) { showToast(err.message, 'error'); }
         }
         async function addTag() {
             const name = document.getElementById('newTagName').value.trim();
             if (!name) return showToast('请输入标签名', 'error');
-            try { await api.post('/api/admin/tags', { name }); document.getElementById('newTagName').value = ''; loadTags(); } catch (err) { showToast(err.message, 'error'); }
+            try { await api.post('/api/admin/tags', { name }); document.getElementById('newTagName').value = ''; loadTags(); }
+            catch (err) { showToast(err.message, 'error'); }
         }
-        async function deleteTag(id) { if (!confirm('确认删除？')) return; try { await api.del(`/api/admin/tags/${id}`); loadTags(); } catch (err) { showToast(err.message, 'error'); } }
-        checkAuth().then(() => { renderNavbar(); if (!isAdmin()) window.location.href = '/'; loadTags(); });
+        async function deleteTag(id) {
+            if (!confirm('确认删除？')) return;
+            try { await api.del(`/api/admin/tags/${id}`); loadTags(); } catch (err) { showToast(err.message, 'error'); }
+        }
+        checkAuth().then(() => {
+            if (!isAdmin()) { window.location.href = '/'; return; }
+            renderSidebar(); loadTags();
+        });
     </script>
 </body>
 </html>

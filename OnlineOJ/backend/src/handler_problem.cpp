@@ -31,7 +31,7 @@ void handle_get_problems(const httplib::Request& req, httplib::Response& res) {
 
     int offset = (page - 1) * page_size;
     std::string sql =
-        "SELECT DISTINCT p.id, p.title, p.description, p.difficulty, p.time_limit_ms, "
+        "SELECT DISTINCT p.id, p.title, p.description, p.language, p.difficulty, p.time_limit_ms, "
         "p.memory_limit_kb, p.author_id, p.created_at, p.updated_at "
         "FROM problems p "
         "LEFT JOIN problem_tags pt ON p.id = pt.problem_id "
@@ -61,12 +61,13 @@ void handle_get_problems(const httplib::Request& req, httplib::Response& res) {
         problem["id"] = problem_id;
         problem["title"] = row[1] ? row[1] : "";
         problem["description"] = row[2] ? row[2] : "";
-        problem["difficulty"] = row[3] ? row[3] : "easy";
-        problem["time_limit_ms"] = row[4] ? std::stoi(row[4]) : 2000;
-        problem["memory_limit_kb"] = row[5] ? std::stoi(row[5]) : 262144;
-        problem["author_id"] = row[6] ? std::stoi(row[6]) : 0;
-        problem["created_at"] = row[7] ? row[7] : "";
-        problem["updated_at"] = row[8] ? row[8] : "";
+        problem["language"] = row[3] ? row[3] : "cpp";
+        problem["difficulty"] = row[4] ? row[4] : "easy";
+        problem["time_limit_ms"] = row[5] ? std::stoi(row[5]) : 2000;
+        problem["memory_limit_kb"] = row[6] ? std::stoi(row[6]) : 262144;
+        problem["author_id"] = row[7] ? std::stoi(row[7]) : 0;
+        problem["created_at"] = row[8] ? row[8] : "";
+        problem["updated_at"] = row[9] ? row[9] : "";
         problem["tags"] = tags;
         items.push_back(problem);
     }
@@ -89,7 +90,7 @@ void handle_get_problem(const httplib::Request& req, httplib::Response& res) {
 
     auto db = DbPool::instance().guard();
 
-    std::string sql = "SELECT id, title, description, difficulty, code_template, "
+    std::string sql = "SELECT id, title, description, language, difficulty, code_template, "
         "time_limit_ms, memory_limit_kb, author_id, created_at, updated_at "
         "FROM problems WHERE id=" + std::to_string(problem_id);
     MYSQL_RES* result = db_query(db.get(), sql);
@@ -104,13 +105,14 @@ void handle_get_problem(const httplib::Request& req, httplib::Response& res) {
     problem["id"] = std::stoi(row[0]);
     problem["title"] = row[1] ? row[1] : "";
     problem["description"] = row[2] ? row[2] : "";
-    problem["difficulty"] = row[3] ? row[3] : "easy";
-    problem["code_template"] = row[4] ? json(row[4]) : json(nullptr);
-    problem["time_limit_ms"] = row[5] ? std::stoi(row[5]) : 2000;
-    problem["memory_limit_kb"] = row[6] ? std::stoi(row[6]) : 262144;
-    problem["author_id"] = row[7] ? std::stoi(row[7]) : 0;
-    problem["created_at"] = row[8] ? row[8] : "";
-    problem["updated_at"] = row[9] ? row[9] : "";
+    problem["language"] = row[3] ? row[3] : "cpp";
+    problem["difficulty"] = row[4] ? row[4] : "easy";
+    problem["code_template"] = row[5] ? json(row[5]) : json(nullptr);
+    problem["time_limit_ms"] = row[6] ? std::stoi(row[6]) : 2000;
+    problem["memory_limit_kb"] = row[7] ? std::stoi(row[7]) : 262144;
+    problem["author_id"] = row[8] ? std::stoi(row[8]) : 0;
+    problem["created_at"] = row[9] ? row[9] : "";
+    problem["updated_at"] = row[10] ? row[10] : "";
 
     std::string tag_sql = "SELECT t.name FROM tags t "
         "JOIN problem_tags pt ON t.id = pt.tag_id WHERE pt.problem_id="

@@ -2,6 +2,7 @@
 #include "db.hpp"
 #include "auth.hpp"
 #include "rate_limiter.hpp"
+#include "handler_submit.hpp"
 #include <httplib.h>
 #include <cstdlib>
 #include <iostream>
@@ -52,6 +53,7 @@ int main() {
 
     Auth::instance().init("");
     RateLimiter::instance().init(rate_limit);
+    start_stale_submission_monitor();
 
     httplib::Server server;
     setup_server(server);

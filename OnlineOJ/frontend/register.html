@@ -1,25 +1,23 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="light">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>注册 - OnlineOJ</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
     <link rel="stylesheet" href="/css/custom.css">
 </head>
 <body>
-    <main class="container">
-        <nav id="navbar"></nav>
-        <article style="max-width:400px;margin:2rem auto">
-            <h3>注册</h3>
+    <div class="auth-container">
+        <div class="auth-card">
+            <h2>◈ OnlineOJ</h2>
             <form id="regForm">
-                <label>用户名 <input type="text" name="username" maxlength="50" required autofocus></label>
-                <label>密码 <input type="password" name="password" required></label>
+                <label>用户名<input type="text" name="username" maxlength="50" required autofocus></label>
+                <label>密码<input type="password" name="password" required></label>
                 <button type="submit">注册</button>
             </form>
-            <p style="margin-top:1rem">已有账号？<a href="/login.html">登录</a></p>
-        </article>
-    </main>
+            <div class="auth-link">已有账号？<a href="/login.html">登录</a></div>
+        </div>
+    </div>
     <div id="toast" class="toast"></div>
     <script src="/js/api.js"></script>
     <script src="/js/auth.js"></script>
@@ -33,11 +31,9 @@
                 await register(fd.get('username'), fd.get('password'));
                 showToast('注册成功，请登录', 'success');
                 setTimeout(() => window.location.href = '/login.html', 1000);
-            } catch (err) {
-                showToast(err.message, 'error');
-            }
+            } catch (err) { showToast(err.message, 'error'); }
         };
-        checkAuth().then(u => { if (u) window.location.href = '/'; renderNavbar(); });
+        checkAuth().then(u => { if (u) window.location.href = '/'; });
     </script>
 </body>
 </html>

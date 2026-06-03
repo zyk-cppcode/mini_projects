@@ -8,7 +8,7 @@
 #include <fstream>
 
 void setup_server(httplib::Server& server) {
-    server.set_mount_point("/", "../frontend/");
+    server.set_mount_point("/", "./frontend/");
 
     server.Options(R"(/api/.*)", [](const httplib::Request&, httplib::Response& res) {
         res.set_header("Access-Control-Allow-Origin", "*");

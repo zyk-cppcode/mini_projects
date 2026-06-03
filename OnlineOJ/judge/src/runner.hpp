@@ -10,5 +10,6 @@ struct RunResult {
 };
 
 RunResult run_test(int submission_id, const std::string& input_data,
-                   int time_limit_ms, int memory_limit_kb);
+                   int time_limit_ms, int memory_limit_kb,
+                   const std::string& language = "cpp");
 void cleanup_work_dir(int submission_id);

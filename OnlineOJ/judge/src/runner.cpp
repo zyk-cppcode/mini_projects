@@ -10,8 +10,19 @@ static std::string work_dir(int submission_id) {
     return "/tmp/judge/" + std::to_string(submission_id);
 }
 
+static bool use_docker() {
+    static int checked = 0;
+    static int available = 0;
+    if (!checked) {
+        checked = 1;
+        available = (system("docker image inspect docker.m.daocloud.io/library/gcc:13 > /dev/null 2>&1") == 0);
+    }
+    return available;
+}
+
 RunResult run_test(int submission_id, const std::string& input_data,
-                   int time_limit_ms, int memory_limit_kb) {
+                   int time_limit_ms, int memory_limit_kb,
+                   const std::string& language) {
     std::string dir = work_dir(submission_id);
     int timeout_sec = (time_limit_ms + 999) / 1000;
     if (timeout_sec < 1) timeout_sec = 1;
@@ -25,12 +36,20 @@ RunResult run_test(int submission_id, const std::string& input_data,
     std::ofstream(in_path) << input_data;
 
     std::ostringstream cmd;
-    cmd << "docker run --rm --cpus=1 --memory=" << mem_mb << "m "
-        << "--network=none --pids-limit=50 --cap-drop=ALL "
-        << "-v " << dir << ":/app "
-        << "docker.m.daocloud.io/library/gcc:13 "
-        << "timeout " << timeout_sec << " /app/solution "
-        << "< " << in_path << " > " << out_path << " 2>" << err_path;
+    if (language == "python") {
+        cmd << "timeout " << timeout_sec << " python3 " << dir << "/solution.py "
+            << "< " << in_path << " > " << out_path << " 2>" << err_path;
+    } else if (use_docker()) {
+        cmd << "docker run --rm --cpus=1 --memory=" << mem_mb << "m "
+            << "--network=none --pids-limit=50 --cap-drop=ALL "
+            << "-v " << dir << ":/app "
+            << "docker.m.daocloud.io/library/gcc:13 "
+            << "timeout " << timeout_sec << " /app/solution "
+            << "< " << in_path << " > " << out_path << " 2>" << err_path;
+    } else {
+        cmd << "timeout " << timeout_sec << " " << dir << "/solution "
+            << "< " << in_path << " > " << out_path << " 2>" << err_path;
+    }
 
     int ret = system(cmd.str().c_str());
     int exit_code = WIFEXITED(ret) ? WEXITSTATUS(ret) : -1;

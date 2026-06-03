@@ -1,39 +1,62 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="light">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>题目管理 - OnlineOJ</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
     <link rel="stylesheet" href="/css/custom.css">
 </head>
 <body>
-    <main class="container">
-        <nav id="navbar"></nav>
-        <h3>题目管理</h3>
-        <button onclick="showCreate()">新建题目</button>
-        <a href="/admin/tags.html" role="button" class="secondary">管理标签</a>
-        <hr>
-        <table role="grid"><thead><tr><th>ID</th><th>标题</th><th>难度</th><th>操作</th></tr></thead><tbody id="problemList"></tbody></table>
-        <dialog id="editDialog" style="max-width:700px">
-            <article>
-                <h4 id="dialogTitle">新建题目</h4>
-                <form id="problemForm">
-                    <input type="hidden" id="editId">
-                    <label>标题 <input type="text" id="editTitle" required></label>
-                    <label>描述 <textarea id="editDesc" rows="4"></textarea></label>
-                    <label>难度 <select id="editDiff"><option value="easy">简单</option><option value="medium">中等</option><option value="hard">困难</option></select></label>
-                    <label>时间限制(ms) <input type="number" id="editTime" value="2000"></label>
-                    <label>内存限制(KB) <input type="number" id="editMem" value="262144"></label>
-                    <label>C++ 模板 <textarea id="editTemplate" rows="4"></textarea></label>
-                    <label>标签 <div id="tagsCheckbox"></div></label>
-                    <label>测试数据(ZIP) <input type="file" id="testdataFile" accept=".zip"></label>
-                    <button type="submit">保存</button>
-                    <button type="button" class="secondary" onclick="document.getElementById('editDialog').close()">取消</button>
-                </form>
-            </article>
-        </dialog>
-    </main>
+    <div id="sidebar"></div>
+    <div id="main-content">
+        <div class="top-bar"><h2>题目管理</h2></div>
+        <div class="content">
+            <div style="margin-bottom:16px;display:flex;gap:8px">
+                <button class="btn btn-primary" onclick="showCreate()">+ 新建题目</button>
+                <a href="/admin/tags.html" class="btn btn-secondary">管理标签</a>
+            </div>
+            <table class="problem-table">
+                <thead><tr><th style="width:50px">ID</th><th>标题</th><th style="width:60px">难度</th><th style="width:100px">操作</th></tr></thead>
+                <tbody id="problemList"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="dialog-overlay" id="editDialog" style="display:none">
+        <div class="dialog-box">
+            <h3 id="dialogTitle">新建题目</h3>
+            <form id="problemForm">
+                <input type="hidden" id="editId">
+                <label>标题 <input type="text" id="editTitle" required></label>
+                <label>描述 <textarea id="editDesc" rows="5"></textarea></label>
+                <div style="display:flex;gap:12px">
+                    <label style="flex:1">语言
+                        <select id="editLang">
+                            <option value="cpp">C++</option>
+                            <option value="python">Python</option>
+                        </select>
+                    </label>
+                    <label style="flex:1">难度
+                        <select id="editDiff">
+                            <option value="easy">简单</option>
+                            <option value="medium">中等</option>
+                            <option value="hard">困难</option>
+                        </select>
+                    </label>
+                    <label style="flex:1">时间限制(ms) <input type="number" id="editTime" value="2000"></label>
+                    <label style="flex:1">内存限制(KB) <input type="number" id="editMem" value="262144"></label>
+                </div>
+                <label>C++ 模板 <textarea id="editTemplate" rows="4"></textarea></label>
+                <label>标签 <div id="tagsCheckbox" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:4px"></div></label>
+                <label>测试数据(ZIP) <input type="file" id="testdataFile" accept=".zip" style="padding:6px"></label>
+                <div class="dialog-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeDialog()">取消</button>
+                    <button type="submit" class="btn btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <div id="toast" class="toast"></div>
     <script src="/js/api.js"></script>
     <script src="/js/auth.js"></script>
@@ -41,32 +64,50 @@
     <script src="/js/components.js"></script>
     <script>
         let allTags = [];
+
+        function openDialog() { document.getElementById('editDialog').style.display = 'flex'; }
+        function closeDialog() { document.getElementById('editDialog').style.display = 'none'; }
+
         async function loadProblems() {
             try {
                 const data = await api.get('/api/problems?page_size=100');
+                const diffName = { easy: '简单', medium: '中等', hard: '困难' };
                 document.getElementById('problemList').innerHTML = data.items.map(p => `
-                    <tr><td>${p.id}</td><td>${htmlEscape(p.title)}</td><td>${p.difficulty}</td>
-                    <td><a href="#" onclick="editProblem(${p.id})">编辑</a> | <a href="#" onclick="deleteProblem(${p.id})" style="color:red">删除</a></td></tr>`).join('');
+                    <tr>
+                        <td class="prob-id">${p.id}</td>
+                        <td class="prob-title">${htmlEscape(p.title)}</td>
+                        <td>${diffName[p.difficulty] || p.difficulty}</td>
+                        <td>
+                            <a href="#" onclick="editProblem(${p.id})" class="btn-sm">编辑</a>
+                            <a href="#" onclick="deleteProblem(${p.id})" style="color:var(--red)" class="btn-sm">删除</a>
+                        </td>
+                    </tr>`).join('');
             } catch (err) { showToast(err.message, 'error'); }
         }
+
         async function loadTags() {
             try { allTags = await api.get('/api/admin/tags'); } catch {}
-            const div = document.getElementById('tagsCheckbox');
-            div.innerHTML = allTags.map(t => `<label style="display:inline;margin-right:1rem"><input type="checkbox" name="tags" value="${t.name}"> ${htmlEscape(t.name)}</label>`).join('');
+            document.getElementById('tagsCheckbox').innerHTML = allTags.map(t =>
+                `<label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:0.85em;color:var(--text-secondary)">
+                    <input type="checkbox" name="tags" value="${t.name}"> ${htmlEscape(t.name)}</label>`
+            ).join('');
         }
+
         function showCreate() {
             document.getElementById('dialogTitle').textContent = '新建题目';
             document.getElementById('editId').value = '';
             document.getElementById('editTitle').value = '';
             document.getElementById('editDesc').value = '';
             document.getElementById('editDiff').value = 'easy';
+            document.getElementById('editLang').value = 'cpp';
             document.getElementById('editTime').value = '2000';
             document.getElementById('editMem').value = '262144';
             document.getElementById('editTemplate').value = '';
             document.getElementById('testdataFile').value = '';
             document.querySelectorAll('#tagsCheckbox input').forEach(c => c.checked = false);
-            document.getElementById('editDialog').showModal();
+            openDialog();
         }
+
         async function editProblem(id) {
             try {
                 const p = await api.get(`/api/problems/${id}`);
@@ -75,52 +116,53 @@
                 document.getElementById('editTitle').value = p.title;
                 document.getElementById('editDesc').value = p.description;
                 document.getElementById('editDiff').value = p.difficulty;
+                document.getElementById('editLang').value = p.language || 'cpp';
                 document.getElementById('editTime').value = p.time_limit_ms;
                 document.getElementById('editMem').value = p.memory_limit_kb;
                 document.getElementById('editTemplate').value = p.code_template || '';
-                document.querySelectorAll('#tagsCheckbox input').forEach(c => c.checked = (p.tags || []).includes(c.value));
-                document.getElementById('editDialog').showModal();
+                document.querySelectorAll('#tagsCheckbox input').forEach(c => c.checked = (p.tags||[]).includes(c.value));
+                openDialog();
             } catch (err) { showToast(err.message, 'error'); }
         }
-        async function deleteProblem(id) { if (!confirm('确认删除？')) return; try { await api.del(`/api/admin/problems/${id}`); showToast('已删除', 'success'); loadProblems(); } catch (err) { showToast(err.message, 'error'); } }
+
+        async function deleteProblem(id) {
+            if (!confirm('确认删除？')) return;
+            try { await api.del(`/api/admin/problems/${id}`); showToast('已删除', 'success'); loadProblems(); }
+            catch (err) { showToast(err.message, 'error'); }
+        }
 
         document.getElementById('problemForm').onsubmit = async (e) => {
             e.preventDefault();
             const id = document.getElementById('editId').value;
-            const title = document.getElementById('editTitle').value;
-            const desc = document.getElementById('editDesc').value;
-            const diff = document.getElementById('editDiff').value;
-            const time = parseInt(document.getElementById('editTime').value);
-            const mem = parseInt(document.getElementById('editMem').value);
-            const tmpl = document.getElementById('editTemplate').value;
-            const tags = [...document.querySelectorAll('#tagsCheckbox input:checked')].map(c => c.value);
-            const body = { title, description: desc, difficulty: diff, time_limit_ms: time, memory_limit_kb: mem, code_template: tmpl, tags };
+            const body = {
+                title: document.getElementById('editTitle').value,
+                description: document.getElementById('editDesc').value,
+                language: document.getElementById('editLang').value,
+                difficulty: document.getElementById('editDiff').value,
+                time_limit_ms: parseInt(document.getElementById('editTime').value),
+                memory_limit_kb: parseInt(document.getElementById('editMem').value),
+                code_template: document.getElementById('editTemplate').value,
+                tags: [...document.querySelectorAll('#tagsCheckbox input:checked')].map(c => c.value)
+            };
             try {
                 if (id) await api.put(`/api/admin/problems/${id}`, body);
                 else {
                     const r = await api.post('/api/admin/problems', body);
                     const file = document.getElementById('testdataFile').files[0];
                     if (file) {
-                        const reader = new FileReader();
-                        reader.onload = async () => {
-                            try {
-                                await fetch(`/api/admin/problems/${r.id}/testdata`, { method: 'POST', body: reader.result, credentials: 'same-origin' });
-                            } catch (err) { showToast('测试数据上传失败', 'error'); }
-                        };
-                        reader.readAsArrayBuffer(file);
+                        const buf = await file.arrayBuffer();
+                        await fetch(`/api/admin/problems/${r.id}/testdata`, { method: 'POST', body: buf, credentials: 'same-origin' });
                     }
                 }
-                document.getElementById('editDialog').close();
+                closeDialog();
                 showToast('保存成功', 'success');
                 loadProblems();
             } catch (err) { showToast(err.message, 'error'); }
         };
 
         checkAuth().then(() => {
-            renderNavbar();
             if (!isAdmin()) { window.location.href = '/'; return; }
-            loadTags();
-            loadProblems();
+            renderSidebar(); loadTags(); loadProblems();
         });
     </script>
 </body>

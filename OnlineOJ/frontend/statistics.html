@@ -1,18 +1,19 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="light">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>个人统计 - OnlineOJ</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
     <link rel="stylesheet" href="/css/custom.css">
 </head>
 <body>
-    <main class="container">
-        <nav id="navbar"></nav>
-        <h3>个人统计</h3>
-        <div id="stats"></div>
-    </main>
+    <div id="sidebar"></div>
+    <div id="main-content">
+        <div class="top-bar"><h2>个人统计</h2></div>
+        <div class="content">
+            <div class="card" id="stats"></div>
+        </div>
+    </div>
     <div id="toast" class="toast"></div>
     <script src="/js/api.js"></script>
     <script src="/js/auth.js"></script>
@@ -23,19 +24,23 @@
             try {
                 const s = await api.get('/api/statistics');
                 document.getElementById('stats').innerHTML = `
-                    <table role="grid">
+                    <h3>${htmlEscape(getCurrentUser().username)}</h3>
+                    <table class="problem-table" style="margin-top:12px">
                         <tbody>
-                            <tr><td>已通过</td><td><strong>${s.solved_count}</strong></td></tr>
+                            <tr><td>已通过</td><td style="color:var(--green);font-weight:700;font-size:1.2em">${s.solved_count}</td></tr>
                             <tr><td>总提交</td><td>${s.total_submissions}</td></tr>
-                            <tr><td>通过率</td><td>${(s.pass_rate * 100).toFixed(1)}%</td></tr>
-                            <tr><td>简单题</td><td>${s.easy_count}</td></tr>
-                            <tr><td>中等题</td><td>${s.medium_count}</td></tr>
-                            <tr><td>困难题</td><td>${s.hard_count}</td></tr>
+                            <tr><td>通过率</td><td style="color:var(--accent)">${(s.pass_rate*100).toFixed(1)}%</td></tr>
+                            <tr><td><span class="diff-badge diff-easy">简单</span></td><td>${s.easy_count}</td></tr>
+                            <tr><td><span class="diff-badge diff-medium">中等</span></td><td>${s.medium_count}</td></tr>
+                            <tr><td><span class="diff-badge diff-hard">困难</span></td><td>${s.hard_count}</td></tr>
                         </tbody>
                     </table>`;
             } catch (err) { showToast(err.message, 'error'); }
         }
-        checkAuth().then(() => { renderNavbar(); if (!isLoggedIn()) window.location.href = '/login.html'; loadStats(); });
+        checkAuth().then(() => {
+            if (!isLoggedIn()) { window.location.href = '/login.html'; return; }
+            renderSidebar(); loadStats();
+        });
     </script>
 </body>
 </html>

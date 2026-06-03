@@ -46,6 +46,7 @@ void handle_submit(const httplib::Request& req, httplib::Response& res) {
 
     int problem_id = body["problem_id"].get<int>();
     std::string code = body["code"].get<std::string>();
+    std::string language = body.value("language", "cpp");
 
     if (code.size() > 65536) {
         return error_response(res, 400, "BAD_REQUEST", "代码长度不能超过64KB");
@@ -75,10 +76,11 @@ void handle_submit(const httplib::Request& req, httplib::Response& res) {
         return error_response(res, 429, "RATE_LIMITED", "提交过于频繁，请稍后再试");
     }
 
-    std::string sql = "INSERT INTO submissions (user_id, problem_id, code, status) VALUES ("
+    std::string sql = "INSERT INTO submissions (user_id, problem_id, code, language, status) VALUES ("
         + std::to_string(user->id) + ", "
         + std::to_string(problem_id) + ", '"
-        + db_escape(db.get(), code) + "', 'pending')";
+        + db_escape(db.get(), code) + "', '"
+        + db_escape(db.get(), language) + "', 'pending')";
     db_execute(db.get(), sql);
     long long submission_id = db_last_insert_id(db.get());
 
@@ -93,6 +95,7 @@ void handle_submit(const httplib::Request& req, httplib::Response& res) {
     json job;
     job["submission_id"] = submission_id;
     job["code"] = code;
+    job["language"] = language;
     job["problem_id"] = problem_id;
     job["time_limit"] = time_limit;
     job["memory_limit"] = memory_limit;
@@ -117,7 +120,7 @@ void handle_get_submission(const httplib::Request& req, httplib::Response& res) 
     int submission_id = std::stoi(req.matches[1]);
     auto db = DbPool::instance().guard();
 
-    std::string sql = "SELECT id, user_id, problem_id, code, status, failed_case, "
+    std::string sql = "SELECT id, user_id, problem_id, code, language, status, failed_case, "
         "time_used_ms, memory_used_kb, passed_cases, total_cases, compile_error, "
         "detail_json, submitted_at, judged_at FROM submissions WHERE id="
         + std::to_string(submission_id);
@@ -134,19 +137,20 @@ void handle_get_submission(const httplib::Request& req, httplib::Response& res) 
     sub["user_id"] = row[1] ? std::stoi(row[1]) : 0;
     sub["problem_id"] = row[2] ? std::stoi(row[2]) : 0;
     sub["code"] = row[3] ? row[3] : "";
-    sub["status"] = row[4] ? row[4] : "pending";
-    sub["failed_case"] = row[5] ? json(std::stoi(row[5])) : json(nullptr);
-    sub["time_used_ms"] = row[6] ? json(std::stoi(row[6])) : json(nullptr);
-    sub["memory_used_kb"] = row[7] ? json(std::stoi(row[7])) : json(nullptr);
-    sub["passed_cases"] = row[8] ? std::stoi(row[8]) : 0;
-    sub["total_cases"] = row[9] ? std::stoi(row[9]) : 0;
-    sub["compile_error"] = row[10] ? json(row[10]) : json(nullptr);
-    sub["submitted_at"] = row[12] ? row[12] : "";
-    sub["judged_at"] = row[13] ? json(row[13]) : json(nullptr);
+    sub["language"] = row[4] ? row[4] : "cpp";
+    sub["status"] = row[5] ? row[5] : "pending";
+    sub["failed_case"] = row[6] ? json(std::stoi(row[6])) : json(nullptr);
+    sub["time_used_ms"] = row[7] ? json(std::stoi(row[7])) : json(nullptr);
+    sub["memory_used_kb"] = row[8] ? json(std::stoi(row[8])) : json(nullptr);
+    sub["passed_cases"] = row[9] ? std::stoi(row[9]) : 0;
+    sub["total_cases"] = row[10] ? std::stoi(row[10]) : 0;
+    sub["compile_error"] = row[11] ? json(row[11]) : json(nullptr);
+    sub["submitted_at"] = row[13] ? row[13] : "";
+    sub["judged_at"] = row[14] ? json(row[14]) : json(nullptr);
 
-    if (row[11] && row[11][0] && std::string(row[11]) != "null") {
+    if (row[12] && row[12][0] && std::string(row[12]) != "null") {
         try {
-            sub["detail"] = json::parse(row[11]);
+            sub["detail"] = json::parse(row[12]);
         } catch (...) {}
     }
 
@@ -271,4 +275,28 @@ void handle_report_result(const httplib::Request& req, httplib::Response& res) {
     resp["data"] = json::object();
     resp["data"]["ok"] = true;
     json_response(res, resp);
+}
+
+#include <thread>
+#include <chrono>
+
+void start_stale_submission_monitor() {
+    std::thread([]() {
+        while (true) {
+            std::this_thread::sleep_for(std::chrono::seconds(10));
+            try {
+                auto db = DbPool::instance().guard();
+                std::string sql =
+                    "UPDATE submissions SET status='system_error', judged_at=NOW() "
+                    "WHERE status IN ('pending','compiling','running') "
+                    "AND submitted_at < NOW() - INTERVAL 30 SECOND";
+                int affected = db_execute(db.get(), sql);
+                if (affected > 0) {
+                    std::cout << "[Monitor] Marked " << affected << " stale submissions as system_error" << std::endl;
+                }
+            } catch (const std::exception& e) {
+                std::cerr << "[Monitor] Error: " << e.what() << std::endl;
+            }
+        }
+    }).detach();
 }

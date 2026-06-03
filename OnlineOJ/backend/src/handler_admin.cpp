@@ -35,6 +35,7 @@ void handle_admin_create_problem(const httplib::Request& req, httplib::Response&
     std::string title = body.value("title", "");
     std::string description = body.value("description", "");
     std::string difficulty = body.value("difficulty", "easy");
+    std::string language = body.value("language", "cpp");
     int time_limit = body.value("time_limit_ms", 2000);
     int memory_limit = body.value("memory_limit_kb", 262144);
     std::string code_template = body.value("code_template", "");
@@ -43,10 +44,11 @@ void handle_admin_create_problem(const httplib::Request& req, httplib::Response&
 
     auto db = DbPool::instance().guard();
 
-    std::string sql = "INSERT INTO problems (title, description, difficulty, "
+    std::string sql = "INSERT INTO problems (title, description, language, difficulty, "
         "time_limit_ms, memory_limit_kb, author_id";
     std::string values = " VALUES ('" + db_escape(db.get(), title) + "', '"
         + db_escape(db.get(), description) + "', '"
+        + db_escape(db.get(), language) + "', '"
         + db_escape(db.get(), difficulty) + "', "
         + std::to_string(time_limit) + ", " + std::to_string(memory_limit)
         + ", " + std::to_string(user->id);
@@ -116,6 +118,8 @@ void handle_admin_update_problem(const httplib::Request& req, httplib::Response&
         updates.push_back("description='" + db_escape(db.get(), body["description"].get<std::string>()) + "'");
     if (body.contains("difficulty"))
         updates.push_back("difficulty='" + db_escape(db.get(), body["difficulty"].get<std::string>()) + "'");
+    if (body.contains("language"))
+        updates.push_back("language='" + db_escape(db.get(), body["language"].get<std::string>()) + "'");
     if (body.contains("time_limit_ms"))
         updates.push_back("time_limit_ms=" + std::to_string(body["time_limit_ms"].get<int>()));
     if (body.contains("memory_limit_kb"))

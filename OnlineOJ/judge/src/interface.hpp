@@ -9,6 +9,7 @@ using json = nlohmann::json;
 struct JudgeTask {
     int submission_id;
     std::string code;
+    std::string language;
     int problem_id;
     int time_limit;
     int memory_limit;

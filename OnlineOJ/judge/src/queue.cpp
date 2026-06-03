@@ -38,6 +38,7 @@ std::optional<JudgeTask> fetch_task(int timeout_seconds) {
         JudgeTask task;
         task.submission_id = j["submission_id"];
         task.code = j["code"];
+        task.language = j.value("language", "cpp");
         task.problem_id = j["problem_id"];
         task.time_limit = j.value("time_limit", 2000);
         task.memory_limit = j.value("memory_limit", 262144);

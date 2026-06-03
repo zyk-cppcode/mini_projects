@@ -1,60 +1,186 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="light">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>题目详情 - OnlineOJ</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
     <link rel="stylesheet" href="/css/custom.css">
+    <style>
+        .editor-wrapper { flex: 1; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); min-height: 300px; position: relative; }
+        .editor-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 8px; }
+        .editor-toolbar select { background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border); border-radius: 7px; padding: 6px 12px; font-size: 0.84em; outline: none; }
+        .theme-btn { padding: 6px 12px; border-radius: 7px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-secondary); cursor: pointer; font-size: 0.82em; transition: all 0.15s; }
+        .theme-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .theme-btn.active { background: var(--accent-light); color: var(--accent); border-color: var(--accent); }
+        #fallbackEditor { display: none; width: 100%; height: 100%; min-height: 300px; }
+    </style>
 </head>
 <body>
-    <main class="container">
-        <nav id="navbar"></nav>
-        <h3 id="problemTitle"></h3>
-        <p><small>难度: <span id="problemDiff"></span> | 标签: <span id="problemTags"></span></small></p>
-        <article id="problemDesc" style="white-space:pre-wrap"></article>
-
-        <h4>提交代码</h4>
-        <textarea id="codeInput" rows="12" style="font-family:monospace;width:100%"></textarea>
-        <button onclick="submitCode()" id="submitBtn" style="margin-top:0.5rem">提交</button>
-        <small id="submitHint" style="margin-left:1rem"></small>
-
-        <div id="resultPanel" class="result-panel" style="display:none"></div>
-    </main>
+    <div id="sidebar"></div>
+    <div id="main-content">
+        <div class="top-bar"><h2 id="topTitle">题目详情</h2></div>
+        <div class="split-layout">
+            <div class="split-left">
+                <h3 id="problemTitle" style="margin-bottom:4px"></h3>
+                <div class="problem-meta">
+                    <span id="problemDiff"></span>
+                    <span id="problemTags"></span>
+                    <span id="problemLang"></span>
+                </div>
+                <div class="problem-desc" id="problemDesc"></div>
+            </div>
+            <div class="split-right">
+                <div class="editor-toolbar">
+                    <div style="display:flex;align-items:center;gap:8px">
+                        <select id="langSelect">
+                            <option value="cpp">C++</option>
+                            <option value="python">Python</option>
+                        </select>
+                        <span id="submitHint" style="font-size:0.82em;color:var(--text-muted)"></span>
+                    </div>
+                    <div style="display:flex;gap:4px" id="themeBtns">
+                        <button class="theme-btn active" data-theme="oj-light" onclick="switchEditorTheme('oj-light', this)">浅色</button>
+                        <button class="theme-btn" data-theme="oj-dark" onclick="switchEditorTheme('oj-dark', this)">深色</button>
+                    </div>
+                </div>
+                <div class="editor-wrapper" id="editorContainer">
+                    <textarea id="fallbackEditor" class="code-editor" spellcheck="false"></textarea>
+                </div>
+                <button class="btn btn-primary" onclick="submitCode()" id="submitBtn" style="margin-top:12px;align-self:flex-start">
+                    ▶ 提交代码
+                </button>
+                <div id="resultPanel" class="result-panel" style="display:none"></div>
+            </div>
+        </div>
+    </div>
     <div id="toast" class="toast"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
     <script src="/js/api.js"></script>
     <script src="/js/auth.js"></script>
     <script src="/js/utils.js"></script>
     <script src="/js/components.js"></script>
     <script>
         const problemId = getParam('id');
+        let editor = null;
         let pollingTimer = null;
-        const diffLabel = { easy: '简单', medium: '中等', hard: '困难' };
+        let currentLang = 'cpp';
+        let problemData = null;
+        const diffClass = { easy: 'diff-easy', medium: 'diff-medium', hard: 'diff-hard' };
+        const diffName = { easy: '简单', medium: '中等', hard: '困难' };
+        const langMap = { cpp: 'cpp', python: 'python', java: 'java' };
+        const langTemplates = {
+            cpp: '#include <iostream>\nusing namespace std;\n\nint main() {\n    \n    return 0;\n}\n',
+            python: 'import sys\n\ndef solve():\n    pass\n\nif __name__ == "__main__":\n    solve()\n'
+        };
 
+        // Load problem data immediately, don't wait for Monaco
         async function loadProblem() {
             try {
                 const p = await api.get(`/api/problems/${problemId}`);
+                problemData = p;
+                document.getElementById('topTitle').textContent = p.title;
                 document.getElementById('problemTitle').textContent = p.title;
-                document.getElementById('problemDiff').textContent = diffLabel[p.difficulty] || p.difficulty;
-                document.getElementById('problemTags').innerHTML = (p.tags || []).map(t => `<kbd>${htmlEscape(t)}</kbd>`).join(' ');
+                document.getElementById('problemDiff').innerHTML = `<span class="diff-badge ${diffClass[p.difficulty]||''}">${diffName[p.difficulty]||p.difficulty}</span>`;
+                document.getElementById('problemTags').innerHTML = (p.tags||[]).map(t => `<span class="diff-badge" style="color:var(--text-muted);background:var(--bg-hover)">${htmlEscape(t)}</span>`).join(' ');
+                document.getElementById('problemLang').innerHTML = `<span class="diff-badge" style="color:var(--accent);background:var(--accent-light)">${p.language||'cpp'}</span>`;
                 document.getElementById('problemDesc').textContent = p.description;
-                if (p.code_template) document.getElementById('codeInput').value = p.code_template;
-                else document.getElementById('codeInput').value = '#include <iostream>\nusing namespace std;\n\nint main() {\n    return 0;\n}\n';
+                const lang = p.language || 'cpp';
+                currentLang = lang;
+                document.getElementById('langSelect').value = lang;
+                setEditorContent(p.code_template || langTemplates[lang] || langTemplates.cpp, lang);
             } catch (err) { showToast(err.message, 'error'); }
         }
 
+        function setEditorContent(code, lang) {
+            if (editor) {
+                monaco.editor.setModelLanguage(editor.getModel(), langMap[lang] || 'cpp');
+                editor.setValue(code);
+            } else {
+                document.getElementById('fallbackEditor').value = code;
+            }
+        }
+
+        function switchEditorTheme(themeName, btn) {
+            document.querySelectorAll('#themeBtns .theme-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            if (editor) monaco.editor.setTheme(themeName);
+        }
+
+        document.getElementById('langSelect').onchange = function() {
+            currentLang = this.value;
+            const tmpl = problemData && problemData.code_template ? problemData.code_template : (langTemplates[currentLang] || '');
+            setEditorContent(tmpl, currentLang);
+        };
+
+        // Init Monaco with fallback
+        function initMonaco() {
+            require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs' }});
+            require(['vs/editor/editor.main'], function() {
+                try {
+                    monaco.editor.defineTheme('oj-light', {
+                        base: 'vs', inherit: true, rules: [],
+                        colors: { 'editor.background': '#ffffff', 'editorLineNumber.foreground': '#c0c0d0' }
+                    });
+                    monaco.editor.defineTheme('oj-dark', {
+                        base: 'vs-dark', inherit: true, rules: [],
+                        colors: { 'editor.background': '#0d1117', 'editorLineNumber.foreground': '#484f58' }
+                    });
+
+                    editor = monaco.editor.create(document.getElementById('editorContainer'), {
+                        value: langTemplates.cpp, language: 'cpp', theme: 'oj-light',
+                        fontSize: 14, lineNumbers: 'on', minimap: { enabled: false },
+                        scrollBeyondLastLine: false, automaticLayout: true, tabSize: 4,
+                        fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
+                        padding: { top: 16, bottom: 16 }
+                    });
+
+                    // Hide fallback
+                    document.getElementById('fallbackEditor').style.display = 'none';
+
+                    // Apply loaded problem data
+                    if (problemData) {
+                        const lang = problemData.language || 'cpp';
+                        const code = problemData.code_template || langTemplates[lang] || langTemplates.cpp;
+                        monaco.editor.setModelLanguage(editor.getModel(), langMap[lang] || 'cpp');
+                        editor.setValue(code);
+                    }
+                } catch(e) {
+                    console.error('Monaco init error:', e);
+                    showFallback();
+                }
+            }, function(err) {
+                console.error('Monaco require error:', err);
+                showFallback();
+            });
+        }
+
+        function showFallback() {
+            document.getElementById('fallbackEditor').style.display = 'block';
+            document.getElementById('fallbackEditor').classList.add('code-editor');
+            if (problemData) {
+                const lang = problemData.language || 'cpp';
+                document.getElementById('fallbackEditor').value = problemData.code_template || langTemplates[lang] || '';
+            }
+        }
+
         async function submitCode() {
-            const code = document.getElementById('codeInput').value;
+            const code = editor ? editor.getValue() : document.getElementById('fallbackEditor').value;
             if (!code.trim()) return showToast('请编写代码', 'error');
-            document.getElementById('submitBtn').disabled = true;
-            document.getElementById('submitHint').textContent = '提交中...';
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = true;
+            document.getElementById('submitHint').textContent = '评测中...';
             document.getElementById('resultPanel').style.display = 'none';
             try {
-                const data = await api.post('/api/submit', { problem_id: parseInt(problemId), code });
+                const data = await api.post('/api/submit', {
+                    problem_id: parseInt(problemId),
+                    code: code,
+                    language: currentLang
+                });
                 pollResult(data.submission_id);
             } catch (err) {
                 showToast(err.message, 'error');
-                document.getElementById('submitBtn').disabled = false;
+                btn.disabled = false;
                 document.getElementById('submitHint').textContent = '';
             }
         }
@@ -88,29 +214,29 @@
             const panel = document.getElementById('resultPanel');
             panel.style.display = 'block';
             const color = statusColor(s.status);
-            let html = `<h4 style="color:${color}">${statusLabel(s.status)}</h4>`;
-            html += `<p>通过: ${s.passed_cases}/${s.total_cases}`;
-            if (s.time_used_ms) html += ` | 耗时: ${s.time_used_ms}ms`;
-            if (s.memory_used_kb) html += ` | 内存: ${s.memory_used_kb}KB`;
+            let html = `<h4 style="color:${color}">${statusLabel(s.status)}</h4>
+                <p style="font-size:0.85em;color:var(--text-muted)">
+                    通过 <b style="color:${s.passed_cases===s.total_cases?'var(--green)':'var(--red)'}">${s.passed_cases}</b>/${s.total_cases}`;
+            if (s.time_used_ms) html += ` &nbsp;|&nbsp; 耗时 ${s.time_used_ms}ms`;
             html += `</p>`;
-
-            if (s.status === 'compilation_error' && s.compile_error) {
-                html += `<details><summary>编译错误</summary><pre class="code-block">${htmlEscape(s.compile_error)}</pre></details>`;
+            if ((s.status === 'compilation_error' || s.status === 'system_error') && s.compile_error) {
+                html += `<details><summary style="color:var(--text-secondary);font-weight:500">错误信息</summary><pre>${htmlEscape(s.compile_error)}</pre></details>`;
             }
-            if (s.status === 'wrong_answer' && s.detail) {
+            if (s.detail) {
                 const d = s.detail;
-                html += `<p>失败测试点: #${s.failed_case}</p>`;
-                if (d.input_data) html += `<details><summary>输入</summary><pre>${htmlEscape(d.input_data)}</pre></details>`;
-                if (d.expected_output) html += `<details><summary>期望输出</summary><pre>${htmlEscape(d.expected_output)}</pre></details>`;
-                if (d.actual_output) html += `<details><summary>实际输出</summary><pre>${htmlEscape(d.actual_output)}</pre></details>`;
+                if (d.input_data) html += `<details><summary style="color:var(--text-secondary)">输入</summary><pre>${htmlEscape(d.input_data)}</pre></details>`;
+                if (d.expected_output) html += `<details><summary style="color:var(--text-secondary)">期望输出</summary><pre>${htmlEscape(d.expected_output)}</pre></details>`;
+                if (d.actual_output) html += `<details><summary style="color:var(--text-secondary)">实际输出</summary><pre>${htmlEscape(d.actual_output)}</pre></details>`;
             }
             panel.innerHTML = html;
         }
 
+        // Startup sequence
         checkAuth().then(() => {
-            renderNavbar();
             if (!isLoggedIn()) { window.location.href = '/login.html'; return; }
-            loadProblem();
+            renderSidebar();
+            loadProblem();           // Load data immediately
+            setTimeout(initMonaco, 100); // Monaco in parallel with slight delay
         });
     </script>
 </body>

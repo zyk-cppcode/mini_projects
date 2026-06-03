@@ -1,25 +1,44 @@
-function renderNavbar() {
-    const nav = document.getElementById('navbar');
-    if (!nav) return;
+function renderSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    if (!sidebar) return;
     const user = getCurrentUser();
     const admin = isAdmin();
-    let html = `<ul><li><strong><a href="/" class="contrast">OnlineOJ</a></strong></li></ul><ul>`;
-    html += `<li><a href="/">题目</a></li>`;
-    html += `<li><a href="/leaderboard.html">排行榜</a></li>`;
+    const path = window.location.pathname;
+
+    let html = '<div class="sidebar-logo"><span class="icon">◈</span>OnlineOJ</div>';
+    html += '<div class="sidebar-nav">';
+
+    const links = [
+        { href: '/', icon: '📋', label: '题目列表' },
+        { href: '/leaderboard.html', icon: '🏆', label: '排行榜' },
+    ];
     if (user) {
-        html += `<li><a href="/submissions.html">提交</a></li>`;
-        html += `<li><a href="/statistics.html">统计</a></li>`;
+        links.push({ href: '/submissions.html', icon: '📜', label: '提交记录' });
+        links.push({ href: '/statistics.html', icon: '📊', label: '个人统计' });
         if (admin) {
-            html += `<li><a href="/admin/problems.html">管理</a></li>`;
+            links.push({ href: '/admin/problems.html', icon: '⚙', label: '管理后台' });
         }
-        html += `<li><span>${htmlEscape(user.username)}</span></li>`;
-        html += `<li><a href="#" onclick="doLogout()">登出</a></li>`;
-    } else {
-        html += `<li><a href="/login.html">登录</a></li>`;
-        html += `<li><a href="/register.html">注册</a></li>`;
     }
-    html += `</ul>`;
-    nav.innerHTML = html;
+
+    links.forEach(l => {
+        const active = (l.href === '/' && (path === '/' || path === '/index.html'))
+            || (l.href !== '/' && path.endsWith(l.href));
+        html += `<a href="${l.href}" class="${active ? 'active' : ''}">
+            <span class="nav-icon">${l.icon}</span><span>${l.label}</span></a>`;
+    });
+
+    html += '</div>';
+
+    html += '<div class="sidebar-user">';
+    if (user) {
+        html += `<span class="username">${htmlEscape(user.username)}</span>`;
+        html += `<a class="logout-btn" href="#" onclick="doLogout(event)">登出</a>`;
+    } else {
+        html += `<a href="/login.html">登录</a>`;
+    }
+    html += '</div>';
+
+    sidebar.innerHTML = html;
 }
 
 function showToast(msg, type = 'info') {
@@ -35,14 +54,14 @@ function renderPagination(page, total, pageSize, onPage) {
     const totalPages = Math.ceil(total / pageSize) || 1;
     let html = '<div class="pagination">';
     for (let i = 1; i <= totalPages; i++) {
-        if (i === page) html += `<strong>${i}</strong> `;
-        else html += `<a href="#" onclick="event.preventDefault();${onPage}(${i})">${i}</a> `;
+        if (i === page) html += `<strong>${i}</strong>`;
+        else html += `<a href="#" onclick="event.preventDefault();${onPage}(${i})">${i}</a>`;
     }
-    html += `</div>`;
+    html += '</div>';
     return html;
 }
 
-async function doLogout() {
-    await logout();
-    window.location.href = '/';
+function doLogout(e) {
+    e.preventDefault();
+    logout().then(() => { window.location.href = '/login.html'; });
 }

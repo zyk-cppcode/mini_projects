@@ -1,20 +1,23 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="light">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>提交记录 - OnlineOJ</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
     <link rel="stylesheet" href="/css/custom.css">
 </head>
 <body>
-    <main class="container">
-        <nav id="navbar"></nav>
-        <h3>提交记录</h3>
-        <div id="loading"></div>
-        <table role="grid"><thead><tr><th>#</th><th>题目</th><th>状态</th><th>通过</th><th>耗时</th><th>提交时间</th></tr></thead><tbody id="subTable"></tbody></table>
-        <div id="pagination"></div>
-    </main>
+    <div id="sidebar"></div>
+    <div id="main-content">
+        <div class="top-bar"><h2>提交记录</h2></div>
+        <div class="content">
+            <table class="problem-table">
+                <thead><tr><th style="width:60px">#</th><th style="width:60px">题目</th><th>状态</th><th style="width:70px">通过</th><th style="width:80px">耗时</th><th>提交时间</th></tr></thead>
+                <tbody id="subTable"></tbody>
+            </table>
+            <div id="pagination"></div>
+        </div>
+    </div>
     <div id="toast" class="toast"></div>
     <script src="/js/api.js"></script>
     <script src="/js/auth.js"></script>
@@ -28,20 +31,19 @@
                 const data = await api.get(`/api/submissions?page=${page}&page_size=20`);
                 document.getElementById('subTable').innerHTML = data.items.map(s => `
                     <tr>
-                        <td><a href="/submission.html?id=${s.id}">${s.id}</a></td>
+                        <td class="prob-id"><a href="/submission.html?id=${s.id}">${s.id}</a></td>
                         <td>${s.problem_id}</td>
-                        <td style="color:${statusColor(s.status)};font-weight:bold">${statusLabel(s.status)}</td>
+                        <td><span style="color:${statusColor(s.status)};font-weight:600">${statusLabel(s.status)}</span></td>
                         <td>${s.passed_cases}/${s.total_cases}</td>
-                        <td>${s.time_used_ms ? s.time_used_ms + 'ms' : '-'}</td>
-                        <td>${formatDate(s.submitted_at)}</td>
-                    </tr>`).join('');
-                document.getElementById('pagination').innerHTML = renderPagination(currentPage, data.total, data.page_size, 'loadSubmissions');
+                        <td>${s.time_used_ms ? s.time_used_ms+'ms' : '-'}</td>
+                        <td style="color:var(--text-muted);font-size:0.85em">${formatDate(s.submitted_at)}</td>
+                    </tr>`).join('') || '<tr><td colspan="6" class="empty-state">暂无提交</td></tr>';
+                document.getElementById('pagination').innerHTML = renderPagination(page, data.total, data.page_size, 'loadSubmissions');
             } catch (err) { showToast(err.message, 'error'); }
         }
         checkAuth().then(() => {
-            renderNavbar();
             if (!isLoggedIn()) { window.location.href = '/login.html'; return; }
-            loadSubmissions(1);
+            renderSidebar(); loadSubmissions(1);
         });
     </script>
 </body>
